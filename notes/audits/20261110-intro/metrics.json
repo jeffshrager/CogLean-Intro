@@ -1,0 +1,87 @@
+{
+ "counts": {
+  "coglib_instances": 5,
+  "coglib_literal_defs": 0,
+  "dependency_violations": 0,
+  "docstring_hits": 30,
+  "generic_lemmas_in_trees": 0,
+  "headline_trees": 94,
+  "identifier_hits": 0,
+  "near_proof_shapes": 1,
+  "promotion_candidates": 13,
+  "relabellings": 3,
+  "repeated_proof_shapes": 1,
+  "same_name": 17,
+  "same_statement": 0,
+  "single_user_defs": 2,
+  "single_user_theorems": 37,
+  "unused_defs": 10,
+  "unused_requires": 0
+ },
+ "metrics": {
+  "ACTR": {
+   "axioms": 0,
+   "defs": 2,
+   "general": 13,
+   "instances": 4,
+   "lines": 310,
+   "modules": 2,
+   "theorems": 17
+  },
+  "CogLib": {
+   "axioms": 0,
+   "defs": 159,
+   "general": 220,
+   "instances": 5,
+   "lines": 4161,
+   "modules": 21,
+   "theorems": 225
+  },
+  "EPAM": {
+   "axioms": 0,
+   "defs": 0,
+   "general": 6,
+   "instances": 3,
+   "lines": 114,
+   "modules": 2,
+   "theorems": 9
+  },
+  "GlobalMatching": {
+   "axioms": 0,
+   "defs": 1,
+   "general": 3,
+   "instances": 4,
+   "lines": 99,
+   "modules": 2,
+   "theorems": 7
+  },
+  "MultiDigit": {
+   "axioms": 0,
+   "defs": 85,
+   "general": 60,
+   "instances": 25,
+   "lines": 1559,
+   "modules": 9,
+   "theorems": 85
+  },
+  "SemanticMemory": {
+   "axioms": 0,
+   "defs": 56,
+   "general": 6,
+   "instances": 7,
+   "lines": 261,
+   "modules": 3,
+   "theorems": 13
+  },
+  "StrategyChoice": {
+   "axioms": 0,
+   "defs": 30,
+   "general": 24,
+   "instances": 7,
+   "lines": 672,
+   "modules": 5,
+   "theorems": 31
+  }
+ },
+ "tag": "20261110-intro"
+}

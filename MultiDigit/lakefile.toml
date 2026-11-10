@@ -1,0 +1,13 @@
+name = "multidigit"
+defaultTargets = ["MultiDigit"]
+
+[[lean_lib]]
+name = "MultiDigit"
+
+[[require]]
+name = "coglib"
+path = "../CogLib"
+
+[[require]]
+name = "strategychoice"
+path = "../StrategyChoice"

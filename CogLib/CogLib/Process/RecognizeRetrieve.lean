@@ -1,0 +1,496 @@
+/-
+Processes: recognize, then retrieve, else back up.
+
+A composition of two mechanisms, over any problem type `P` and answer type
+`A`:
+1. **Recognition**, by any memory: a problem's code calls up a stored code,
+   or nothing, with probabilities (`retrieve`).
+2. **Associative retrieval** on the recognized code's associations: sample
+   answers in proportion to strength, state one that clears the criterion,
+   and give up after `n` searches (`search`, after the
+   distributions-of-associations model).
+3. **A backup**, when nothing is recognized or retrieval is exhausted.
+
+The theorems hold for every memory, encoding, strengths, criterion, search
+length and backup: any task with problems, a familiar set and a backup is an
+instance, such as answering arithmetic problems or naming familiar people.
+
+With no law of memory:
+* `backup_prob`, `retrieved_prob`: backup use, and answers stated by retrieval with a
+  property, are averages over what the code calls up.
+* For a code that calls up a stored `y` for certain:
+  - `backup_prob_certain`: backup is used with probability `(1 - R_y)^n`;
+  - `retrieved_depends_only_on_route`, `same_route_same_retrieval`;
+  - `confusion_gives_neighbours_answer`, `wrong_eq_retrieved_of_sharp`;
+  - `confident_errors`: a problem confused with a familiar one, whose
+    associations are sharp, errs on every answer stated by retrieval, with no more
+    backup use than the familiar problem (`Phenomena.ConfusionErrorPattern`);
+  - `confident_errors_rate`: the same with the rate as a bound
+    (`Phenomena.ConfidentErrors`);
+  - `same_correct_confusion_harmless`.
+* For a code that calls up a stored `q` with probability at least `1 - δ`:
+  - `confident_errors_graded`: the pattern to within `2δ`
+    (`Phenomena.GradedConfidentErrors`), for memories whose retrieval is
+    never certain. ACT-R's memory with priming is an instance
+    (`Process/PrimedRecognition`).
+
+From laws of memory (`Phenomena/RetrievalLaws`):
+* `confident_errors_of_laws`: any memory with determinate retrieval,
+  certainty and stability produces confident errors whenever a stranger can
+  be taken for a studied item with sharp associations.
+-/
+
+import CogLib.Process.SampledRetrieval
+import CogLib.Phenomena.RetrievalLaws
+import CogLib.Phenomena.ConfusionErrors
+
+namespace Cog
+
+open Dist
+
+/-- The route by which an answer was reached. -/
+inductive Route where
+  | retrieved
+  | backup
+  deriving Repr, DecidableEq
+
+@[simp] theorem Route.retrieved_beq_retrieved : (Route.retrieved == Route.retrieved) = true := rfl
+@[simp] theorem Route.backup_beq_backup : (Route.backup == Route.backup) = true := rfl
+@[simp] theorem Route.retrieved_beq_backup : (Route.retrieved == Route.backup) = false := rfl
+@[simp] theorem Route.backup_beq_retrieved : (Route.backup == Route.retrieved) = false := rfl
+
+namespace RR
+
+variable {P A : Type}
+
+/-- The backup was used. -/
+def isBackup (o : Route × A) : Bool := o.1 == .backup
+
+/-- An answer was stated by retrieval. -/
+def isRetrieved (o : Route × A) : Bool := o.1 == .retrieved
+
+/-- A answer stated by retrieval with property `Q` was stated. -/
+def retrievedSuch (Q : A → Bool) (o : Route × A) : Bool := o.1 == .retrieved && Q o.2
+
+/-- A wrong answer stated by retrieval to `x`. -/
+def retrievedWrong [DecidableEq A] (correct : P → A) (x : P) : Route × A → Bool :=
+  retrievedSuch fun a => a != correct x
+
+/-- The associations of `y` are *sharp* at criterion `cc`: no answer but `c`
+clears it. -/
+def Sharp (str : Item → A → Rat) (cc : Rat) (y : Item) (c : A) : Prop :=
+  ∀ a, above (str y) cc a = true → a = c
+
+theorem isRetrieved_eq : (isRetrieved : Route × A → Bool) = retrievedSuch (fun _ => true) := by
+  funext o; simp [isRetrieved, retrievedSuch]
+
+/-- What follows recognition: retrieval on the stored code called up, with the
+backup when it is exhausted, or when nothing is called up. -/
+def afterRecognition (str : Item → A → Rat) (as : List A) (cc : Rat) (n : Nat)
+    (backup : P → Dist A) (x : P) : Option Item → Dist (Route × A)
+  | none => Dist.bind (backup x) fun r => Dist.pure (.backup, r)
+  | some y => Dist.bind (search as (str y) cc 0 n) fun
+      | .stated a _ => Dist.pure (.retrieved, a)
+      | .exhausted => Dist.bind (backup x) fun r => Dist.pure (.backup, r)
+
+end RR
+
+/-- **Recognize, then retrieve, else back up.** -/
+def recognizeRetrieve {P A : Type} (code : P → Item) (retrieve : Item → Dist (Option Item))
+    (str : Item → A → Rat) (as : List A) (cc : Rat) (n : Nat) (backup : P → Dist A) (x : P) :
+    Dist (Route × A) :=
+  Dist.bind (retrieve (code x)) (RR.afterRecognition str as cc n backup x)
+
+namespace RR
+
+variable {P A : Type} [DecidableEq A] (code : P → Item) (retrieve : Item → Dist (Option Item))
+  (str : Item → A → Rat) (as : List A) (cc : Rat) (n : Nat) (backup : P → Dist A)
+
+/-- The backup, as part of a trial, makes every outcome a backup outcome. -/
+theorem prob_backup_part (x : P) (e : Route × A → Bool) :
+    prob (Dist.bind (backup x) fun r => Dist.pure (Route.backup, r)) e =
+      prob (backup x) (fun r => e (.backup, r)) :=
+  prob_bind_pure _ _ _
+
+/-- The chance of the backup once `r` is called up. -/
+def backupAfter : Option Item → Rat
+  | none => 1
+  | some y => (1 - reach as (str y) cc) ^ n
+
+/-- The chance of a answer stated by retrieval with property `Q` once `r` is called
+up. -/
+def retrievedAfter (Q : A → Bool) : Option Item → Rat
+  | none => 0
+  | some y => prob (search as (str y) cc 0 n) (Retrieval.statedSuch Q)
+
+theorem prob_backup_after (x : P) (hb : mass (backup x) = 1)
+    (hT : ∀ y, total as (str y) ≠ 0) (r : Option Item) :
+    prob (afterRecognition str as cc n backup x r) isBackup = backupAfter str as cc n r := by
+  cases r with
+  | none =>
+    simp only [afterRecognition, backupAfter]
+    rw [prob_backup_part]
+    simpa [isBackup, mass] using hb
+  | some y =>
+    simp only [afterRecognition, backupAfter]
+    rw [prob_bind_split _ _ _ (fun _ => false) Retrieval.isExhausted 1]
+    · rw [prob_false, prob_exhausted as (str y) cc (hT y)]; grind
+    · intro r
+      cases r with
+      | stated a k => simp [prob_pure, isBackup, Retrieval.isExhausted]; grind
+      | exhausted =>
+        simp only [Retrieval.isExhausted]
+        rw [prob_backup_part]
+        simp only [isBackup, Route.backup_beq_backup, mass] at hb ⊢
+        rw [hb]; grind
+
+theorem prob_retrieved_after (x : P) (Q : A → Bool) (r : Option Item) :
+    prob (afterRecognition str as cc n backup x r) (retrievedSuch Q) = retrievedAfter str as cc n Q r := by
+  cases r with
+  | none =>
+    simp only [afterRecognition, retrievedAfter]
+    rw [prob_backup_part]
+    simp only [retrievedSuch, Route.backup_beq_retrieved, Bool.false_and]
+    exact prob_false _
+  | some y =>
+    simp only [afterRecognition, retrievedAfter]
+    rw [prob_bind_split _ _ _ (Retrieval.statedSuch Q) (fun _ => false) 0]
+    · rw [prob_false]; grind
+    · intro r
+      cases r with
+      | stated a k =>
+        by_cases hp : Q a <;> simp [prob_pure, retrievedSuch, Retrieval.statedSuch, hp] <;> grind
+      | exhausted =>
+        simp only [Retrieval.statedSuch]
+        rw [prob_backup_part]
+        simp only [retrievedSuch, Route.backup_beq_retrieved, Bool.false_and]
+        rw [prob_false]; grind
+
+/-- **Backup use, with any memory**: the average, over what the code calls up,
+of `1` (nothing) and `(1 - R_y)^n` (a stored `y`). -/
+theorem backup_prob (x : P) (hb : mass (backup x) = 1) (hT : ∀ y, total as (str y) ≠ 0) :
+    prob (recognizeRetrieve code retrieve str as cc n backup x) isBackup =
+      ((retrieve (code x)).map fun rp => rp.2 * backupAfter str as cc n rp.1).sum := by
+  unfold recognizeRetrieve
+  rw [prob_bind_sum]
+  simp only [prob_backup_after str as cc n backup x hb hT]
+
+/-- **Answers stated by retrieval, with any memory**: the average, over the stored
+codes called up, of retrieval's chance of stating such an answer. -/
+theorem retrieved_prob (x : P) (Q : A → Bool) :
+    prob (recognizeRetrieve code retrieve str as cc n backup x) (retrievedSuch Q) =
+      ((retrieve (code x)).map fun rp => rp.2 * retrievedAfter str as cc n Q rp.1).sum := by
+  unfold recognizeRetrieve
+  rw [prob_bind_sum]
+  simp only [prob_retrieved_after str as cc n backup x Q]
+
+/-- A trial on a code that calls up `r` for certain. -/
+theorem recognizeRetrieve_certain (x : P) (r : Option Item) (h : retrieve (code x) = pure r) :
+    recognizeRetrieve code retrieve str as cc n backup x = afterRecognition str as cc n backup x r := by
+  unfold recognizeRetrieve
+  rw [h, bind_pure_left]
+
+/-- **Strategy nesting, for a code that calls up `r` for certain.** -/
+theorem backup_prob_certain (x : P) (r : Option Item) (h : retrieve (code x) = pure r)
+    (hb : mass (backup x) = 1) (hT : ∀ y, total as (str y) ≠ 0) :
+    prob (recognizeRetrieve code retrieve str as cc n backup x) isBackup =
+      backupAfter str as cc n r := by
+  rw [recognizeRetrieve_certain code retrieve str as cc n backup x r h]
+  exact prob_backup_after str as cc n backup x hb hT r
+
+/-- **Retrieval depends only on the route.** -/
+theorem retrieved_depends_only_on_route (x : P) (y : Item) (Q : A → Bool)
+    (h : retrieve (code x) = pure (some y)) :
+    prob (recognizeRetrieve code retrieve str as cc n backup x) (retrievedSuch Q) =
+      prob (search as (str y) cc 0 n) (Retrieval.statedSuch Q) := by
+  rw [recognizeRetrieve_certain code retrieve str as cc n backup x _ h]
+  exact prob_retrieved_after str as cc n backup x Q (some y)
+
+/-- Two problems that call up the same stored code for certain are answered
+alike by retrieval. -/
+theorem same_route_same_retrieval (x x' : P) (y : Item) (Q : A → Bool)
+    (h : retrieve (code x) = pure (some y)) (h' : retrieve (code x') = pure (some y)) :
+    prob (recognizeRetrieve code retrieve str as cc n backup x) (retrievedSuch Q) =
+      prob (recognizeRetrieve code retrieve str as cc n backup x') (retrievedSuch Q) := by
+  rw [retrieved_depends_only_on_route code retrieve str as cc n backup x y Q h,
+    retrieved_depends_only_on_route code retrieve str as cc n backup x' y Q h']
+
+/-- **A confused problem gets its neighbour's answer.** -/
+theorem confusion_gives_neighbours_answer (correct : P → A) (x q : P)
+    (hT : total as (str (code q)) ≠ 0) (h : retrieve (code x) = pure (some (code q)))
+    (hs : Sharp str cc (code q) (correct q)) :
+    prob (recognizeRetrieve code retrieve str as cc n backup x)
+      (retrievedSuch fun a => a != correct q) = 0 := by
+  rw [retrieved_depends_only_on_route code retrieve str as cc n backup x _ _ h,
+    prob_stated _ _ _ _ hT]
+  have : reachSuch as (str (code q)) cc (fun a => a != correct q) = 0 := by
+    simp only [reachSuch]
+    rw [prob_congr _ _ (fun _ => false), prob_false]
+    intro a
+    by_cases ha : above (str (code q)) cc a
+    · simp [hs a ha]
+    · simp [ha]
+  rw [this]; grind
+
+/-- Retrieval on sharp associations states a wrong answer for `x` exactly as
+often as it states any answer, when `x`'s correct answer is not `c`. -/
+theorem wrong_eq_retrieved_of_sharp (correct : P → A) (x : P) (y : Item) (c : A)
+    (hT : total as (str y) ≠ 0) (h : retrieve (code x) = pure (some y)) (hs : Sharp str cc y c)
+    (hne : correct x ≠ c) :
+    prob (recognizeRetrieve code retrieve str as cc n backup x) (retrievedWrong correct x) =
+      prob (recognizeRetrieve code retrieve str as cc n backup x) isRetrieved := by
+  rw [retrievedWrong, isRetrieved_eq, retrieved_depends_only_on_route code retrieve str as cc n backup x y _ h,
+    retrieved_depends_only_on_route code retrieve str as cc n backup x y _ h,
+    prob_stated _ _ _ _ hT, prob_stated _ _ _ _ hT]
+  congr 1
+  simp only [reachSuch]
+  apply prob_congr
+  intro a
+  by_cases ha : above (str y) cc a
+  · have := hs a ha
+    simp [this, Ne.symm hne]
+  · simp [ha]
+
+/-- **Confident errors, with any memory.** Let the familiar `q` call up itself
+for certain, with sharp associations, and let `x`, whose correct answer
+differs, call up `q` for certain. Then retrieval never errs on `q`, always
+errs on `x`, and `x` falls back on the backup exactly as often as `q` does:
+`Phenomena.ConfusionErrorPattern`. Equal backup use is not low backup use;
+`backup_prob_certain` gives the rate. -/
+theorem confident_errors (correct : P → A) (x q : P) (hT : ∀ y, total as (str y) ≠ 0)
+    (hbx : mass (backup x) = 1) (hbq : mass (backup q) = 1)
+    (hq : retrieve (code q) = pure (some (code q)))
+    (hx : retrieve (code x) = pure (some (code q)))
+    (hs : Sharp str cc (code q) (correct q)) (hne : correct x ≠ correct q) :
+    Phenomena.ConfusionErrorPattern (recognizeRetrieve code retrieve str as cc n backup)
+      (retrievedWrong correct) isRetrieved isBackup x q := by
+  refine ⟨confusion_gives_neighbours_answer code retrieve str as cc n backup correct q q (hT _) hq hs,
+    wrong_eq_retrieved_of_sharp code retrieve str as cc n backup correct x _ _ (hT _) hx hs hne, ?_⟩
+  rw [backup_prob_certain code retrieve str as cc n backup x _ hx hbx hT,
+    backup_prob_certain code retrieve str as cc n backup q _ hq hbq hT]
+
+/-- Under the conditions of `confident_errors`, the errors are confident to
+the degree that `q`'s retrieval succeeds: backup use on `x` is at most
+`backupAfter` for `q`'s code, the chance that `n` searches of `q`'s
+associations are exhausted (`Phenomena.ConfidentErrors`). Whether that is
+small depends on the strengths, criterion and search length. -/
+theorem confident_errors_rate (correct : P → A) (x q : P) (hT : ∀ y, total as (str y) ≠ 0)
+    (hbx : mass (backup x) = 1) (hbq : mass (backup q) = 1)
+    (hq : retrieve (code q) = pure (some (code q)))
+    (hx : retrieve (code x) = pure (some (code q)))
+    (hs : Sharp str cc (code q) (correct q)) (hne : correct x ≠ correct q) :
+    Phenomena.ConfidentErrors (recognizeRetrieve code retrieve str as cc n backup)
+      (retrievedWrong correct) isRetrieved isBackup x q (backupAfter str as cc n (some (code q))) :=
+  (confident_errors code retrieve str as cc n backup correct x q hT hbx hbq hq hx hs hne).confident
+    (by rw [backup_prob_certain code retrieve str as cc n backup x _ hx hbx hT]; exact Rat.le_refl)
+
+omit [DecidableEq A] in
+/-- Backup use after any recognition outcome is a probability. -/
+theorem backupAfter_bounds (hs : ∀ y a, 0 ≤ str y a) (hT : ∀ y, total as (str y) ≠ 0) (r : Option Item) :
+    0 ≤ backupAfter str as cc n r ∧ backupAfter str as cc n r ≤ 1 := by
+  cases r with
+  | none => simp [backupAfter]; decide +kernel
+  | some y =>
+    simp only [backupAfter]
+    have h0 := reach_nonneg as (str y) cc (hs y)
+    have h1 := reach_le_one as (str y) cc (hs y) (hT y)
+    refine ⟨Rat.pow_nonneg (by grind), ?_⟩
+    have h1n : ∀ m : Nat, (1 : Rat) ^ m = 1 := by
+      intro m
+      induction m with
+      | zero => rfl
+      | succ k ih => rw [Rat.pow_succ, ih]; decide +kernel
+    have := pow_le_pow_of_le n (show (0:Rat) ≤ 1 - reach as (str y) cc by grind) (show 1 - reach as (str y) cc ≤ 1 by grind)
+    rw [h1n] at this; exact this
+
+omit [DecidableEq A] in
+/-- So is a answer stated by retrieval with any property. -/
+theorem retrievedAfter_bounds (hs : ∀ y a, 0 ≤ str y a) (hT : ∀ y, total as (str y) ≠ 0) (Q : A → Bool)
+    (r : Option Item) : 0 ≤ retrievedAfter str as cc n Q r ∧ retrievedAfter str as cc n Q r ≤ 1 := by
+  cases r with
+  | none => simp [retrievedAfter]; decide +kernel
+  | some y =>
+    simp only [retrievedAfter]
+    have hn := nonneg_search as (str y) cc (hs y) n 0
+    refine ⟨prob_nonneg _ _ hn, ?_⟩
+    have := prob_le_mass _ (Retrieval.statedSuch Q) hn
+    rw [mass_search as (str y) cc (hT y)] at this; exact this
+
+omit [DecidableEq A] in
+/-- On a sharp code, no answer lacking the property of the one answer above
+the criterion is stated. -/
+theorem retrievedAfter_sharp_zero (y : Item) (c : A) (hT : total as (str y) ≠ 0)
+    (hs : Sharp str cc y c) (Q : A → Bool) (hQ : Q c = false) :
+    retrievedAfter str as cc n Q (some y) = 0 := by
+  simp only [retrievedAfter]
+  rw [prob_stated _ _ _ _ hT]
+  have : reachSuch as (str y) cc Q = 0 := by
+    simp only [reachSuch]
+    rw [prob_congr _ _ (fun _ => false), prob_false]
+    intro a
+    by_cases ha : above (str y) cc a
+    · simp [hs a ha, hQ]
+    · simp [ha]
+  rw [this]; grind
+
+/-- **Graded confident errors, with any memory.** Let `x` call up the
+familiar `q`, and `q` call up itself, each with probability at least
+`1 - δ`, where `q`'s associations are sharp and `x`'s correct answer differs.
+Then the confusion-error pattern holds to within `2δ`, and backup use on `x`
+is at most `q`'s exhaustion rate plus `δ`. At `δ = 0` this is
+`confident_errors_rate`, without needing retrieval to be certain. The
+postulates are recognition, sharp-criterion retrieval and the backup; the
+conditions are the two recognition bounds, sharpness and well-formedness
+(nonnegative strengths and weights, proper distributions). -/
+theorem confident_errors_graded (correct : P → A) (x q : P) (δ : Rat)
+    (hs0 : ∀ y a, 0 ≤ str y a) (hT : ∀ y, total as (str y) ≠ 0)
+    (hbx : mass (backup x) = 1) (hbq : mass (backup q) = 1)
+    (hnx : Nonneg (retrieve (code x))) (hmx : mass (retrieve (code x)) = 1)
+    (hnq : Nonneg (retrieve (code q))) (hmq : mass (retrieve (code q)) = 1)
+    (hq : 1 - δ ≤ prob (retrieve (code q)) (· == some (code q)))
+    (hx : 1 - δ ≤ prob (retrieve (code x)) (· == some (code q)))
+    (hs : Sharp str cc (code q) (correct q)) (hne : correct x ≠ correct q) :
+    Phenomena.GradedConfidentErrors (recognizeRetrieve code retrieve str as cc n backup)
+      (retrievedWrong correct) isRetrieved isBackup x q (2 * δ)
+      (backupAfter str as cc n (some (code q)) + δ) := by
+  let t : Option Item := some (code q)
+  let g : Option Item → Bool := (· == t)
+  have hg : ∀ r, g r = true → r = t := by intro r h; simpa [g] using h
+  have bx := backup_prob code retrieve str as cc n backup x hbx hT
+  have bq := backup_prob code retrieve str as cc n backup q hbq hT
+  have Bx := expect_bounds (retrieve (code x)) (backupAfter str as cc n) g (backupAfter str as cc n t) hnx
+    (fun r => (backupAfter_bounds str as cc n hs0 hT r).1) (fun r => (backupAfter_bounds str as cc n hs0 hT r).2)
+    (fun r h => by rw [hg r h])
+  have Bq := expect_bounds (retrieve (code q)) (backupAfter str as cc n) g (backupAfter str as cc n t) hnq
+    (fun r => (backupAfter_bounds str as cc n hs0 hT r).1) (fun r => (backupAfter_bounds str as cc n hs0 hT r).2)
+    (fun r h => by rw [hg r h])
+  have hb01 := backupAfter_bounds str as cc n hs0 hT t
+  have px1 := prob_le_mass _ g hnx
+  have pq1 := prob_le_mass _ g hnq
+  simp only [expect] at Bx Bq
+  rw [← bx] at Bx; rw [← bq] at Bq
+  have wq := retrieved_prob code retrieve str as cc n backup q (fun a => a != correct q)
+  have Wq := expect_bounds (retrieve (code q)) (retrievedAfter str as cc n (fun a => a != correct q)) g 0 hnq
+    (fun r => (retrievedAfter_bounds str as cc n hs0 hT _ r).1) (fun r => (retrievedAfter_bounds str as cc n hs0 hT _ r).2)
+    (fun r h => by rw [hg r h]; exact retrievedAfter_sharp_zero str as cc n _ _ (hT _) hs _ (by simp))
+  simp only [expect] at Wq; rw [← wq] at Wq
+  have hsplit : prob (recognizeRetrieve code retrieve str as cc n backup x) isRetrieved =
+      prob (recognizeRetrieve code retrieve str as cc n backup x) (retrievedWrong correct x) +
+      prob (recognizeRetrieve code retrieve str as cc n backup x) (retrievedSuch fun a => a == correct x) := by
+    rw [isRetrieved_eq, prob_split _ _ (fun o => o.2 != correct x)]
+    congr 1
+    · apply prob_congr; intro o; simp [retrievedSuch, retrievedWrong]
+    · apply prob_congr; intro o; by_cases h : o.2 = correct x <;> simp [retrievedSuch, bne, h]
+  have wx := retrieved_prob code retrieve str as cc n backup x (fun a => a == correct x)
+  have Wx := expect_bounds (retrieve (code x)) (retrievedAfter str as cc n (fun a => a == correct x)) g 0 hnx
+    (fun r => (retrievedAfter_bounds str as cc n hs0 hT _ r).1) (fun r => (retrievedAfter_bounds str as cc n hs0 hT _ r).2)
+    (fun r h => by rw [hg r h]; exact retrievedAfter_sharp_zero str as cc n _ _ (hT _) hs _ (by simp [Ne.symm hne]))
+  simp only [expect] at Wx; rw [← wx] at Wx
+  have hv0 : 0 ≤ backupAfter str as cc n t := hb01.1
+  have hv1 : backupAfter str as cc n t ≤ 1 := hb01.2
+  have k1 : prob (retrieve (code x)) g * backupAfter str as cc n t ≤ backupAfter str as cc n t := by
+    have := Rat.mul_le_mul_of_nonneg_right (show prob (retrieve (code x)) g ≤ 1 by grind) hv0; simpa using this
+  have k2 : prob (retrieve (code q)) g * backupAfter str as cc n t ≤ backupAfter str as cc n t := by
+    have := Rat.mul_le_mul_of_nonneg_right (show prob (retrieve (code q)) g ≤ 1 by grind) hv0; simpa using this
+  have k3 : (1 - δ) * backupAfter str as cc n t ≤ prob (retrieve (code x)) g * backupAfter str as cc n t :=
+    Rat.mul_le_mul_of_nonneg_right hx hv0
+  have k4 : (1 - δ) * backupAfter str as cc n t ≤ prob (retrieve (code q)) g * backupAfter str as cc n t :=
+    Rat.mul_le_mul_of_nonneg_right hq hv0
+  have hδ : 0 ≤ δ := by grind
+  have k5 : δ * backupAfter str as cc n t ≤ δ := by
+    have := Rat.mul_le_mul_of_nonneg_left hv1 hδ; simpa using this
+  rw [hmx] at Bx Wx; rw [hmq] at Bq Wq
+  simp only [Rat.mul_zero] at Wx Wq
+  unfold Phenomena.GradedConfidentErrors Phenomena.GradedConfusionPattern
+  simp only [retrievedWrong] at hsplit ⊢
+  refine ⟨⟨?_, ?_, ?_, ?_⟩, ?_⟩ <;> grind
+/-- **Confusion with a problem of the same correct answer is harmless.** -/
+theorem same_correct_confusion_harmless (correct : P → A) (x q : P)
+    (hq : retrieve (code q) = pure (some (code q)))
+    (hx : retrieve (code x) = pure (some (code q))) (hsum : correct x = correct q) :
+    prob (recognizeRetrieve code retrieve str as cc n backup x) (retrievedWrong correct x) =
+      prob (recognizeRetrieve code retrieve str as cc n backup q) (retrievedWrong correct q) := by
+  rw [retrievedWrong, retrievedWrong, hsum]
+  exact same_route_same_retrieval code retrieve str as cc n backup x q _ _ hx hq
+
+/-- **Confident errors, from laws of memory.** For any memory with
+determinate retrieval, certainty and stability: after a study list without
+repeats, if a stranger `x` can be taken for a studied `q` (with positive
+probability), and `q`'s associations are sharp, then `confident_errors`
+holds. Whether a memory has the three laws is proved for it: EPAM's
+discrimination nets have them, and ACT-R's declarative memory never does. -/
+theorem confident_errors_of_laws {S : Type} (R : Retriever S Item) (s0 : S) (U : List Item)
+    (hdet : Laws.Determinate R s0 U) (hcert : Laws.Certainty R s0 U)
+    (hstab : Laws.Stability R s0 U) (xs : List Item) (hxs : ∀ y ∈ xs, y ∈ U) (hnd : xs.Nodup)
+    (correct : P → A) (x q : P) (hq : code q ∈ xs)
+    (hconf : 0 < Laws.pRet R (R.studyAll s0 xs) (code x) (code q))
+    (hT : ∀ y, total as (str y) ≠ 0) (hbx : mass (backup x) = 1) (hbq : mass (backup q) = 1)
+    (hs : Sharp str cc (code q) (correct q)) (hne : correct x ≠ correct q) :
+    Phenomena.ConfusionErrorPattern
+      (recognizeRetrieve code (R.retrieve (R.studyAll s0 xs)) str as cc n backup)
+      (retrievedWrong correct) isRetrieved isBackup x q := by
+  have hr : Laws.Reachable R s0 U (R.studyAll s0 xs) := ⟨xs, hxs, rfl⟩
+  have hq' := Laws.retrieve_of_pRet_one R s0 U hdet _ hr (code q) (code q)
+    (Laws.studied_selfRetrieval R s0 U hcert hstab xs hxs hnd (code q) hq)
+  have hx' := Laws.retrieve_of_pRet_pos R s0 U hdet _ hr (code x) (code q) hconf
+  exact confident_errors code _ str as cc n backup correct x q hT hbx hbq hq' hx' hs hne
+
+
+/-- **Graded confident errors, from graded laws of memory.** For any memory
+whose retrieval is proper, determinate within `δd`, certain within `δc` and
+stable within `η`: after a study list `xs` without repeats, if a stranger `x`
+can be taken for a studied `q` with probability above `δd`, and `q`'s
+associations are sharp, the trial makes graded confident errors within `2δ`,
+for `δ = δd + δc + |xs| η`. With all tolerances 0 these are the exact laws
+(`Laws.determinateWithin_zero` and the rest), so the theorem covers every
+memory `confident_errors_of_laws` covers. Assumed laws: the graded ones;
+conditions: confusability above `δd`, sharpness, well-formedness. -/
+theorem confident_errors_of_graded_laws {S : Type} (R : Retriever S Item) (s0 : S) (U : List Item)
+    (δd δc η : Rat) (hδd : 0 ≤ δd) (hδc : 0 ≤ δc) (hη : 0 ≤ η)
+    (hprop : Laws.ProperRetrieval R s0 U) (hdet : Laws.DeterminateWithin δd R s0 U)
+    (hcert : Laws.CertaintyWithin δc R s0 U) (hstab : Laws.StabilityWithin η R s0 U)
+    (xs : List Item) (hxs : ∀ y ∈ xs, y ∈ U) (hnd : xs.Nodup)
+    (correct : P → A) (x q : P) (hq : code q ∈ xs)
+    (hconf : δd < Laws.pRet R (R.studyAll s0 xs) (code x) (code q))
+    (hs0 : ∀ y a, 0 ≤ str y a) (hT : ∀ y, total as (str y) ≠ 0)
+    (hbx : mass (backup x) = 1) (hbq : mass (backup q) = 1)
+    (hs : Sharp str cc (code q) (correct q)) (hne : correct x ≠ correct q) :
+    Phenomena.GradedConfidentErrors
+      (recognizeRetrieve code (R.retrieve (R.studyAll s0 xs)) str as cc n backup)
+      (retrievedWrong correct) isRetrieved isBackup x q (2 * (δd + δc + (xs.length : Rat) * η))
+      (backupAfter str as cc n (some (code q)) + (δd + δc + (xs.length : Rat) * η)) := by
+  have hr : Laws.Reachable R s0 U (R.studyAll s0 xs) := ⟨xs, hxs, rfl⟩
+  obtain ⟨nx, mx⟩ := hprop _ hr (code x)
+  obtain ⟨nq, mq⟩ := hprop _ hr (code q)
+  have hqq := Laws.studied_selfRetrieval_within δc η hη R s0 U hcert hstab xs hxs hnd (code q) hq
+  have hxq := Laws.pRet_ge_of_within δd R s0 U hdet hprop _ hr (code x) (code q) hconf
+  have hl : (0 : Rat) ≤ (xs.length : Rat) * η := Rat.mul_nonneg Rat.natCast_nonneg hη
+  apply confident_errors_graded code _ str as cc n backup correct x q _ hs0 hT hbx hbq nx mx nq mq
+    _ _ hs hne
+  · unfold Laws.pRet at hqq; grind
+  · unfold Laws.pRet at hxq; grind
+
+
+/-- **Recognize-retrieve depends on its backup only as a distribution**: with
+backups that are the same distribution, the trials are. -/
+theorem same_backup (b b' : P → Dist A) (x : P) (hb : Same (b x) (b' x)) :
+    Same (recognizeRetrieve code retrieve str as cc n b x) (recognizeRetrieve code retrieve str as cc n b' x) := by
+  have hk : Same (Dist.bind (b x) fun r => Dist.pure (Route.backup, r))
+      (Dist.bind (b' x) fun r => Dist.pure (Route.backup, r)) :=
+    same_bind hb fun _ => Same.refl _
+  unfold recognizeRetrieve
+  refine same_bind (Same.refl _) fun r => ?_
+  cases r with
+  | none => exact hk
+  | some y =>
+    exact same_bind (Same.refl _) fun o => by cases o <;> first | exact Same.refl _ | exact hk
+
+/-- So every probability of the trial is the same with such backups. -/
+theorem prob_same_backup (b b' : P → Dist A) (x : P) (hb : Same (b x) (b' x))
+    (e : Route × A → Bool) :
+    prob (recognizeRetrieve code retrieve str as cc n b x) e =
+      prob (recognizeRetrieve code retrieve str as cc n b' x) e :=
+  (same_backup code retrieve str as cc n b b' x hb).prob e
+
+end RR
+end Cog

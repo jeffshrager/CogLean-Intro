@@ -1,0 +1,398 @@
+/-
+The phenomena the distributions-of-associations model explains, as
+consequences of its postulates.
+
+The chapter's central claim is that errors, solution times and overt
+strategy use "are all functions of a single variable: the distribution of
+associations between problems and potential answers" (p. 238). The theorems
+below make that precise for one trial, with a given confidence criterion and
+search length, and find its limits.
+
+* `retrieval_prob`: retrieval is used with probability `1 - (1 - R)^n`,
+  the chapter's `(1 - R)^N` for overt strategy use (p. 250).
+* `retrieval_error_share`: among retrieval trials, the share of errors is
+  the wrong answers' share of the strength above the criterion, for every
+  search length (p. 250's equation has no `N` in it).
+* `retrieval_independent_of_backup`: neither depends on the backup
+  strategies.
+* `counting_error_share`: among counting trials, the share of errors is the
+  counting process's error rate on the sum, whatever the associations: the
+  chapter's "nonintuitive prediction" (p. 245).
+* `peaking_lowers_retrieval_errors`: moving strength to the correct answer
+  never raises the error share among retrieval trials, at any criterion.
+* `correct_strengthening_lowers_errors`: learning from a correct answer
+  (A6), however it was reached, never raises the error share on retrieval
+  trials.
+* `peaking_can_raise_overt_use`: but making a distribution more peaked can
+  *raise* overt strategy use, even averaged over the chapter's twelve
+  confidence criteria. "A peaked distribution results in less frequent use
+  of overt strategies" (p. 245) needs a condition the chapter doesn't state.
+* `correct_strengthening_never_raises_backup`,
+  `dominant_strengthening_never_raises_backup`: learning (A6), which adds
+  strength to a correct answer without renormalizing, never raises backup
+  use when the correct answer is already above the criterion (in particular,
+  when it is the strongest), at any criterion and search length.
+* `strengthening_below_criterion_can_raise_backup`: without that condition
+  it can.
+* `normalized_strengthening_can_raise_backup`: with renormalization after
+  learning, an alternative the chapter does not adopt, strengthening the
+  strongest answer can raise backup use from 0 to 62/105.
+-/
+
+import StrategyChoice.Postulates
+
+namespace SC
+
+open Cog Dist
+
+/-- The backup strategies never count as retrieval, nor state a retrieval
+error. -/
+theorem prob_backup_zero (as : List Answer) (s : Answer → Rat) (bk : Backup) (cc : Rat)
+    (p : Problem) (e : Strategy × Answer → Bool)
+    (hf : ∀ a, e (.fingers, a) = false) (hc : ∀ a, e (.countingFingers, a) = false) :
+    prob (backup as s bk cc p) e = 0 := by
+  unfold backup
+  rw [prob_bind_split _ _ _ (fun _ => false) (fun _ => false) 0]
+  · rw [prob_false]; grind
+  · intro a
+    split
+    · simp [prob_pure, hf] <;> grind
+    · rw [prob_bind_split _ _ _ (fun _ => false) (fun _ => false) 0]
+      · rw [prob_false]; simp <;> grind
+      · intro r; simp [prob_pure, hc] <;> grind
+
+/-- Retrieval-trial events: the probability of an event that holds only on
+retrieval trials with answers in `P` is that of retrieval stating an answer
+in `P`. -/
+theorem prob_trial_retrieval (as : List Answer) (s : Answer → Rat) (bk : Backup) (cc : Rat)
+    (n : Nat) (p : Problem) (e : Strategy × Answer → Bool) (P : Answer → Bool)
+    (hr : ∀ a, e (.retrieval, a) = P a)
+    (hf : ∀ a, e (.fingers, a) = false) (hc : ∀ a, e (.countingFingers, a) = false) :
+    prob (trial as s bk cc n p) e = prob (search as s cc 0 n) (Retrieval.statedSuch P) := by
+  unfold trial
+  rw [prob_bind_split _ _ _ (Retrieval.statedSuch P) (fun _ => false) 0]
+  · rw [prob_false]; grind
+  · intro r
+    cases r with
+    | stated a k => by_cases h : P a <;> simp [prob_pure, hr, h, Retrieval.statedSuch] <;> grind
+    | exhausted => simp [prob_backup_zero as s bk cc p e hf hc, Retrieval.statedSuch] <;> grind
+
+/-- **Retrieval is used with probability `1 - (1 - R)^n`** (p. 250: overt
+strategies with probability `(1 - R)^N`). -/
+theorem retrieval_prob (as : List Answer) (s : Answer → Rat) (bk : Backup) (cc : Rat) (n : Nat)
+    (p : Problem) (hT : total as s ≠ 0) :
+    prob (trial as s bk cc n p) isRetrieval = 1 - (1 - reach as s cc) ^ n := by
+  rw [prob_trial_retrieval as s bk cc n p isRetrieval (fun _ => true)
+    (by intro a; rfl) (by intro a; rfl) (by intro a; rfl)]
+  rw [prob_stated as s cc _ hT]
+  have : reachSuch as s cc (fun _ => true) = reach as s cc := by
+    simp only [reachSuch, reach, Bool.and_true]
+  rw [this, reach_mul_geom]
+
+/-- Retrieval errors: the probability of stating a wrong answer by
+retrieval. -/
+theorem retrievalWrong_prob (as : List Answer) (s : Answer → Rat) (bk : Backup) (cc : Rat)
+    (n : Nat) (p : Problem) (hT : total as s ≠ 0) :
+    prob (trial as s bk cc n p) (retrievalWrong p) =
+      reachSuch as s cc (fun a => a != p.sum) * geom (1 - reach as s cc) n := by
+  rw [prob_trial_retrieval as s bk cc n p (retrievalWrong p) (fun a => a != p.sum)
+    (by intro a; simp [retrievalWrong]) (by intro a; simp [retrievalWrong])
+    (by intro a; simp [retrievalWrong])]
+  exact prob_stated as s cc _ hT n 0
+
+/-- **The error share on retrieval trials** is the wrong answers' share of
+the strength above the criterion, whatever the search length. -/
+theorem retrieval_error_share (as : List Answer) (s : Answer → Rat) (bk : Backup) (cc : Rat)
+    (n : Nat) (p : Problem) (hT : total as s ≠ 0) (hA : strengthIn as s (above s cc) ≠ 0) :
+    prob (trial as s bk cc n p) (retrievalWrong p) =
+      prob (trial as s bk cc n p) isRetrieval * aboveShare as s cc (fun a => a != p.sum) := by
+  rw [retrievalWrong_prob as s bk cc n p hT, retrieval_prob as s bk cc n p hT,
+    ← reach_mul_geom, ← reachSuch_div_reach as s cc _ hT hA]
+  have hR : reach as s cc ≠ 0 := by
+    simp only [reach, prob_sample]
+    intro h
+    have := (by grind : ∀ x T : Rat, T ≠ 0 → x / T = 0 → x = 0) _ _ hT h
+    exact hA this
+  generalize reach as s cc = R at *
+  grind
+
+/-- **Retrieval does not depend on the backup strategies**: how often it is
+used, and how often it errs, are the same whatever the elaboration and
+counting. -/
+theorem retrieval_independent_of_backup (as : List Answer) (s : Answer → Rat) (bk bk' : Backup)
+    (cc : Rat) (n : Nat) (p : Problem) (hT : total as s ≠ 0) :
+    prob (trial as s bk cc n p) isRetrieval = prob (trial as s bk' cc n p) isRetrieval ∧
+      prob (trial as s bk cc n p) (retrievalWrong p) =
+        prob (trial as s bk' cc n p) (retrievalWrong p) := by
+  rw [retrieval_prob as s bk cc n p hT, retrieval_prob as s bk' cc n p hT,
+    retrievalWrong_prob as s bk cc n p hT, retrievalWrong_prob as s bk' cc n p hT]
+  exact ⟨rfl, rfl⟩
+
+/-- Counting is a proper distribution. -/
+theorem mass_count (qs qd : Rat) : ∀ k, mass (count qs qd k) = 1 := by
+  intro k
+  induction k with
+  | zero => simp [mass, count, prob_pure] <;> grind
+  | succ k ih =>
+    simp only [mass, count]
+    rw [prob_bind_split _ _ _ (fun _ => true) (fun _ => false) 0]
+    · simp only [mass] at ih; rw [ih, prob_false]; grind
+    · intro r; simp [prob] <;> grind
+
+/-- **A trial is a proper distribution** when the associations, and the
+associations elaborated on the fingers, have positive total strength. -/
+theorem mass_trial (as : List Answer) (s : Answer → Rat) (bk : Backup) (cc : Rat) (n : Nat)
+    (p : Problem) (hT : total as s ≠ 0) (hE : total as (elaborate s p.sum bk.e) ≠ 0) :
+    mass (trial as s bk cc n p) = 1 := by
+  unfold trial
+  apply mass_bind _ _ (mass_search as s cc hT n 0)
+  intro o
+  cases o with
+  | stated a k => exact mass_pure _
+  | exhausted =>
+    unfold backup
+    apply mass_bind _ _ (mass_sample _ _ hE)
+    intro a
+    split
+    · exact mass_pure _
+    · exact mass_bind _ _ (mass_count _ _ _) fun _ => mass_pure _
+
+/-- Counting with nonnegative error rates has nonnegative weights. -/
+theorem nonneg_count (qs qd : Rat) (h1 : 0 ≤ qs) (h2 : 0 ≤ qd) (h3 : 0 ≤ 1 - qs - qd) :
+    ∀ k, Nonneg (count qs qd k) := by
+  intro k
+  induction k with
+  | zero => exact nonneg_pure _
+  | succ k ih =>
+    simp only [count]
+    apply nonneg_bind _ _ ih
+    intro r ap h
+    simp only [List.mem_cons, List.not_mem_nil, or_false] at h
+    rcases h with rfl | rfl | rfl <;> assumption
+
+theorem nonneg_elaborate (s : Answer → Rat) (objects : Nat) (e : Rat) (hs : ∀ a, 0 ≤ s a)
+    (he : 0 ≤ e) (a : Answer) : 0 ≤ elaborate s objects e a := by
+  simp only [elaborate]
+  apply div_nonneg'
+  · have := hs a; split <;> grind
+  · grind
+
+/-- **A trial has nonnegative weights** when the strengths, the elaboration and
+the counting rates are nonnegative. With `mass_trial`, it is a probability
+distribution. -/
+theorem nonneg_trial (as : List Answer) (s : Answer → Rat) (bk : Backup) (cc : Rat) (n : Nat)
+    (p : Problem) (hs : ∀ a, 0 ≤ s a) (he : 0 ≤ bk.e) (h1 : 0 ≤ bk.qs) (h2 : 0 ≤ bk.qd)
+    (h3 : 0 ≤ 1 - bk.qs - bk.qd) : Nonneg (trial as s bk cc n p) := by
+  unfold trial
+  apply nonneg_bind _ _ (nonneg_search as s cc hs n 0)
+  intro o
+  cases o with
+  | stated a k => exact nonneg_pure _
+  | exhausted =>
+    unfold backup
+    apply nonneg_bind _ _ (nonneg_sample _ _ (nonneg_elaborate s _ _ hs he))
+    intro a
+    split
+    · exact nonneg_pure _
+    · exact nonneg_bind _ _ (nonneg_count _ _ h1 h2 h3 _) fun _ => nonneg_pure _
+
+/-- Events on counting trials, by the answer counted. -/
+theorem prob_trial_counting (as : List Answer) (s : Answer → Rat) (bk : Backup) (cc : Rat)
+    (n : Nat) (p : Problem) (e : Strategy × Answer → Bool) (P : Answer → Bool)
+    (hr : ∀ a, e (.retrieval, a) = false) (hf : ∀ a, e (.fingers, a) = false)
+    (hc : ∀ a, e (.countingFingers, a) = P a) (hT : total as s ≠ 0) :
+    prob (trial as s bk cc n p) e =
+      (1 - reach as s cc) ^ n *
+        (prob (sample as (elaborate s p.sum bk.e)) (fun a => !above (elaborate s p.sum bk.e) cc a) *
+          prob (count bk.qs bk.qd p.sum) P) := by
+  have hcount : prob (Dist.bind (count bk.qs bk.qd p.sum)
+      fun r => Dist.pure (Strategy.countingFingers, r)) e = prob (count bk.qs bk.qd p.sum) P := by
+    rw [prob_bind_split _ _ _ P (fun _ => false) 0]
+    · rw [prob_false]; grind
+    · intro r; by_cases h : P r <;> simp [prob_pure, hc, h] <;> grind
+  have hback : prob (backup as s bk cc p) e =
+      prob (sample as (elaborate s p.sum bk.e)) (fun a => !above (elaborate s p.sum bk.e) cc a) *
+        prob (count bk.qs bk.qd p.sum) P := by
+    unfold backup
+    rw [prob_bind_split _ _ _ (fun _ => false) (fun a => !above (elaborate s p.sum bk.e) cc a)
+      (prob (count bk.qs bk.qd p.sum) P)]
+    · rw [prob_false]; grind
+    · intro a
+      split
+      · rename_i h; simp [prob_pure, hf, h] <;> grind
+      · rename_i h; simp [h, hcount] <;> grind
+  unfold trial
+  rw [prob_bind_split _ _ _ (fun _ => false) Retrieval.isExhausted (prob (backup as s bk cc p) e)]
+  · rw [prob_false, prob_exhausted as s cc hT, hback]; grind
+  · intro r
+    cases r with
+    | stated a k => simp [prob_pure, hr, Retrieval.isExhausted] <;> grind
+    | exhausted => simp [Retrieval.isExhausted] <;> grind
+
+/-- **The error share on counting trials** is the counting process's error
+rate on the sum: it involves neither the associations, nor the criterion, nor
+the search length (p. 245). -/
+theorem counting_error_share (as : List Answer) (s : Answer → Rat) (bk : Backup) (cc : Rat)
+    (n : Nat) (p : Problem) (hT : total as s ≠ 0) :
+    prob (trial as s bk cc n p) (countingWrong p) =
+      prob (trial as s bk cc n p) isCounting * prob (count bk.qs bk.qd p.sum) (fun a => a != p.sum) := by
+  rw [prob_trial_counting as s bk cc n p (countingWrong p) (fun a => a != p.sum)
+      (by intro a; simp [countingWrong]) (by intro a; simp [countingWrong])
+      (by intro a; simp [countingWrong]) hT,
+    prob_trial_counting as s bk cc n p isCounting (fun _ => true)
+      (by intro a; rfl) (by intro a; rfl) (by intro a; rfl) hT]
+  have := mass_count bk.qs bk.qd p.sum
+  simp only [mass] at this
+  rw [this]; grind
+
+/-- **Moving strength to the correct answer never raises the error share on
+retrieval trials**, at any confidence criterion and search length. Strengths
+`s'` give the correct answer at least what `s` gives it, and every wrong
+answer at most. -/
+theorem peaking_lowers_retrieval_errors (as : List Answer) (s s' : Answer → Rat) (cc : Rat)
+    (p : Problem) (hs : ∀ a, 0 ≤ s a) (hs' : ∀ a, 0 ≤ s' a)
+    (hc : s p.sum ≤ s' p.sum) (hother : ∀ a, a ≠ p.sum → s' a ≤ s a)
+    (hA : 0 < strengthIn as s (above s cc)) (hA' : 0 < strengthIn as s' (above s' cc)) :
+    aboveShare as s' cc (fun a => a != p.sum) ≤ aboveShare as s cc (fun a => a != p.sum) :=
+  aboveShare_shift as s s' cc p.sum hs hs' hc hother hA hA'
+
+/-- **Learning from a correct answer never raises retrieval errors** (A6).
+After the correct answer is stated, by any strategy (retrieval, fingers or
+counting), and strengthened, the error share on retrieval trials is no larger
+at any criterion. This is how backup strategies improve later retrieval. -/
+theorem correct_strengthening_lowers_errors (as : List Answer) (s : Answer → Rat) (inc cc : Rat)
+    (p : Problem) (hs : ∀ a, 0 ≤ s a) (hinc : 0 ≤ inc) (hA : 0 < strengthIn as s (above s cc)) :
+    aboveShare as (strengthen s inc p.sum p.sum) cc (fun a => a != p.sum) ≤
+      aboveShare as s cc (fun a => a != p.sum) := by
+  have hge : ∀ a, s a ≤ strengthen s inc p.sum p.sum a := by
+    intro a; simp only [strengthen]; split <;> grind
+  have hs' : ∀ a, 0 ≤ strengthen s inc p.sum p.sum a := fun a => Rat.le_trans (hs a) (hge a)
+  have hA' : 0 < strengthIn as (strengthen s inc p.sum p.sum) (above (strengthen s inc p.sum p.sum) cc) := by
+    have hmono : strengthIn as s (above s cc) ≤
+        strengthIn as (strengthen s inc p.sum p.sum) (above (strengthen s inc p.sum p.sum) cc) := by
+      apply strengthIn_mono as _ s _ _ hs'
+      intro a ha
+      simp only [above, decide_eq_true_eq] at ha ⊢
+      have := hge a
+      exact ⟨by grind, this⟩
+    grind
+  apply peaking_lowers_retrieval_errors as s _ cc p hs hs' (hge p.sum) _ hA hA'
+  intro a ha; simp [strengthen, ha]
+
+/-! ### Peakedness and overt strategy use -/
+
+/-- The twelve confidence criteria of the mathematical model (p. 250). -/
+def criteria : List Rat :=
+  [5/100, 10/100, 15/100, 20/100, 30/100, 40/100, 50/100, 60/100, 70/100, 80/100, 90/100, 1]
+
+/-- Overt strategy use with search length `n`, averaged over the twelve
+criteria. -/
+def meanOvert (as : List Answer) (s : Answer → Rat) (n : Nat) : Rat :=
+  (criteria.map fun cc => (1 - reach as s cc) ^ n).foldl (· + ·) 0 / 12
+
+/-- A problem, `1 + 1`, with answers 2 (correct), 3 and 1. -/
+def peakProblem : Problem := ⟨1, 1⟩
+def peakAnswers : List Answer := [2, 3, 1]
+
+/-- Strengths .38, .31, .31 ... -/
+def flatter : Answer → Rat := fun a => if a = 2 then 38/100 else if a = 3 then 31/100 else 31/100
+/-- ... and .39, .30, .31: one hundredth moved from a wrong answer to the
+correct one, which was already the strongest. -/
+def peaked : Answer → Rat := fun a => if a = 2 then 39/100 else if a = 3 then 30/100 else 31/100
+
+/-- **Peaking can raise overt strategy use.** Moving strength to the correct
+answer, already the peak, raises the overt strategy use predicted with search
+length 1, averaged over the chapter's twelve criteria, from 7/12 to 73/120.
+(The wrong answer drops to the criterion .30 and so below it.) -/
+theorem peaking_can_raise_overt_use :
+    peaked peakProblem.sum ≥ flatter peakProblem.sum ∧
+      (∀ a, a ≠ peakProblem.sum → peaked a ≤ flatter a) ∧
+      meanOvert peakAnswers flatter 1 = 7 / 12 ∧
+      meanOvert peakAnswers peaked 1 = 73 / 120 := by
+  refine ⟨by decide +kernel, ?_, by decide +kernel, by decide +kernel⟩
+  intro a ha
+  have h2 : a ≠ 2 := ha
+  simp only [peaked, flatter, h2, ite_false]
+  split <;> decide +kernel
+
+/-! ### Learning and backup use -/
+
+theorem strengthIn_eq_zero (as : List Answer) (s : Answer → Rat) (e : Answer → Bool)
+    (h : ∀ a ∈ as, e a = false) : strengthIn as s e = 0 := by
+  induction as with
+  | nil => rfl
+  | cons a as ih =>
+    simp only [strengthIn, h a (List.mem_cons_self ..),
+      ih (fun b hb => h b (List.mem_cons_of_mem _ hb))]
+    grind
+
+/-- **Learning from a correct answer never raises backup use** (A6), when
+the correct answer is already above the confidence criterion, or no answer
+is. At every criterion and search length, retrieval is exhausted, so a
+backup strategy used, no more often after the correct answer is
+strengthened. The condition is needed
+(`strengthening_below_criterion_can_raise_backup`), and so is learning
+without renormalization (`normalized_strengthening_can_raise_backup`). -/
+theorem correct_strengthening_never_raises_backup (as : List Answer) (s : Answer → Rat)
+    (inc cc : Rat) (p : Problem) (hs : ∀ a, 0 ≤ s a) (hinc : 0 ≤ inc) (hT : 0 < total as s)
+    (habove : above s cc p.sum = true ∨ strengthIn as s (above s cc) = 0) (n k : Nat) :
+    prob (search as (strengthen s inc p.sum p.sum) cc k n) Retrieval.isExhausted ≤
+      prob (search as s cc k n) Retrieval.isExhausted :=
+  exhausted_boost as s _ cc p.sum hs (by simp [strengthen]; grind)
+    (fun a ha => by simp [strengthen, ha]) hT habove n k
+
+/-- **Strengthening the strongest answer never raises backup use.** If the
+correct answer is already the strongest, learning from it never makes a
+backup strategy more likely, at any criterion and search length. -/
+theorem dominant_strengthening_never_raises_backup (as : List Answer) (s : Answer → Rat)
+    (inc cc : Rat) (p : Problem) (hs : ∀ a, 0 ≤ s a) (hinc : 0 ≤ inc) (hT : 0 < total as s)
+    (hdom : ∀ a ∈ as, s a ≤ s p.sum) (n k : Nat) :
+    prob (search as (strengthen s inc p.sum p.sum) cc k n) Retrieval.isExhausted ≤
+      prob (search as s cc k n) Retrieval.isExhausted := by
+  apply correct_strengthening_never_raises_backup as s inc cc p hs hinc hT _ n k
+  by_cases h : above s cc p.sum = true
+  · exact Or.inl h
+  · refine Or.inr (strengthIn_eq_zero as s _ fun a ha => ?_)
+    simp only [above, decide_eq_true_eq] at h ⊢
+    have := hdom a ha
+    simp only [decide_eq_false_iff_not]; grind
+
+/-- Strengths .2 on the correct answer 2 and .5 on 3. -/
+def belowS : Answer → Rat := fun a => if a = 2 then 2/10 else 5/10
+
+/-- **Strengthening an answer below the criterion can raise backup use.**
+With criterion .30 and search length 1, adding .05 to the correct answer,
+still below the criterion, makes the acceptable answer less likely to be
+drawn: backup use rises from 2/7 to 1/3. -/
+theorem strengthening_below_criterion_can_raise_backup :
+    prob (search [2, 3] belowS (3/10) 0 1) Retrieval.isExhausted = 2 / 7 ∧
+      prob (search [2, 3] (strengthen belowS (1/40) peakProblem.sum peakProblem.sum) (3/10) 0 1)
+        Retrieval.isExhausted = 1 / 3 := by
+  refine ⟨by decide +kernel, by decide +kernel⟩
+
+/-- **An alternative learning rule: strengthen, then renormalize** so that
+strengths sum to one. The chapter renormalizes after elaboration (A4) but
+not after learning (A6); this is the other reading. -/
+def strengthenNorm (as : List Answer) (s : Answer → Rat) (inc : Rat) (correct stated : Answer) :
+    Answer → Rat :=
+  fun a => strengthen s inc correct stated a / total as (strengthen s inc correct stated)
+
+/-- **With renormalization, strengthening the strongest answer can raise
+backup use.** Strengths .38, .31, .31 (summing to one), criterion .30,
+search length 1. Every answer is above the criterion, so a backup is never
+used. Learning from the correct answer adds .05 to it. Without
+renormalization a backup is still never used (as
+`dominant_strengthening_never_raises_backup` requires); with it the wrong
+answers fall to .31/1.05, below the criterion, and a backup is used with
+probability 62/105, about .59. -/
+theorem normalized_strengthening_can_raise_backup :
+    total peakAnswers flatter = 1 ∧
+      (∀ a ∈ peakAnswers, flatter a ≤ flatter peakProblem.sum) ∧
+      prob (search peakAnswers flatter (3/10) 0 1) Retrieval.isExhausted = 0 ∧
+      prob (search peakAnswers (strengthen flatter (1/40) peakProblem.sum peakProblem.sum) (3/10) 0 1)
+        Retrieval.isExhausted = 0 ∧
+      prob (search peakAnswers (strengthenNorm peakAnswers flatter (1/40) peakProblem.sum peakProblem.sum)
+        (3/10) 0 1) Retrieval.isExhausted = 62 / 105 := by
+  refine ⟨by decide +kernel, by decide +kernel, by decide +kernel, by decide +kernel, by decide +kernel⟩
+
+end SC

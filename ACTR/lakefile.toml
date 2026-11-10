@@ -1,0 +1,9 @@
+name = "actr"
+defaultTargets = ["ACTR"]
+
+[[lean_lib]]
+name = "ACTR"
+
+[[require]]
+name = "coglib"
+path = "../CogLib"

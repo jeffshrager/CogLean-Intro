@@ -1,0 +1,9 @@
+name = "epam"
+defaultTargets = ["EPAM"]
+
+[[lean_lib]]
+name = "EPAM"
+
+[[require]]
+name = "coglib"
+path = "../CogLib"

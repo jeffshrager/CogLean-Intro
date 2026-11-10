@@ -1,0 +1,9 @@
+name = "globalmatching"
+defaultTargets = ["GlobalMatching"]
+
+[[lean_lib]]
+name = "GlobalMatching"
+
+[[require]]
+name = "coglib"
+path = "../CogLib"
