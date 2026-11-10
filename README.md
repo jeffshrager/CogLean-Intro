@@ -1,4 +1,4 @@
-# CogLean-20261110-Intro
+# CogLean-Intro
 
 An invitation to [CogLean](https://github.com/jeffshrager/CogLean), a library of cognitive
 theory in the Lean 4 proof assistant, organized on the model of Mathlib. Mechanisms are

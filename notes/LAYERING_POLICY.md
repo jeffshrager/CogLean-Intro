@@ -6,7 +6,7 @@ departures from this policy; it does not decide them.
 
 ## The layers
 
-1. **Lean**: core only. CogLean-20261110-Intro uses no Mathlib.
+1. **Lean**: core only. CogLean-Intro uses no Mathlib.
 2. **CogLib**: the general library. It imports no other package.
 3. **Theories**: one package each (`EPAM/`, `StrategyChoice/`, `ACTR/`). A theory states its
    postulates as choices of CogLib constructs, cited to its sources, with its parameters, its
@@ -76,7 +76,7 @@ departures from this policy; it does not decide them.
 ## Changes
 
 - 2026-11-05: first version (in the CogLean lab).
-- 2026-11-10: carried into CogLean-20261110-Intro, with `SemanticMemory/` as a further theory package.
+- 2026-11-10: carried into CogLean-Intro, with `SemanticMemory/` as a further theory package.
 - 2026-11-06: adapted for CogLean-20261106-Intro: no Mathlib; the naming rules (only CogLib declares
   `namespace Cog`; CogLib docstrings cite theories, not packages), proposed by the lab's
   baseline audit (finding F012).

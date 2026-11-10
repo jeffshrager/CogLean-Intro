@@ -1,6 +1,6 @@
-# Working on CogLean-20261110-Intro
+# Working on CogLean-Intro
 
-CogLean-20261110-Intro is a small, self-contained invitation to CogLean for cognitive
+CogLean-Intro is a small, self-contained invitation to CogLean for cognitive
 scientists who do not know Lean: four demonstrations (the 1984 strategy-choice chapter checked;
 Collins & Quillian's impossibility; the multi-digit composition with its ACT-R rival; the
 memory theory matrix) and a paper built around them. It is not the main line of CogLean; the
