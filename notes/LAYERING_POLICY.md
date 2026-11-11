@@ -77,6 +77,6 @@ departures from this policy; it does not decide them.
 
 - 2026-11-05: first version (in the CogLean lab).
 - 2026-11-10: carried into CogLean-Intro, with `SemanticMemory/` as a further theory package.
-- 2026-11-06: adapted for CogLean-20261106-Intro: no Mathlib; the naming rules (only CogLib declares
+- 2026-11-06: adapted for the introductory edition: no Mathlib; the naming rules (only CogLib declares
   `namespace Cog`; CogLib docstrings cite theories, not packages), proposed by the lab's
   baseline audit (finding F012).

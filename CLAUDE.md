@@ -4,8 +4,8 @@ CogLean-Intro is a small, self-contained invitation to CogLean for cognitive
 scientists who do not know Lean: four demonstrations (the 1984 strategy-choice chapter checked;
 Collins & Quillian's impossibility; the multi-digit composition with its ACT-R rival; the
 memory theory matrix) and a paper built around them. It is not the main line of CogLean; the
-lab repository (`../repo`, github.com/jeffshrager/CogLean) is, and `../CogLean-20261106-Intro`
-carries the multi-digit model in full. Keep it small: add only what the four demonstrations
+lab repository (`../repo`, github.com/jeffshrager/CogLean) is, and carries the multi-digit
+model in full. Keep it small: add only what the four demonstrations
 and the paper need.
 
 ## Build

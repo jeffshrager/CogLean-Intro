@@ -23,9 +23,9 @@ questions a cognitive scientist might ask, and answers each with one short demon
 4. **Can theories be compared by what they entail?** The memory theory matrix: four formalized
    memory families against six laws of retrieval, every verdict a theorem (`notes/MATRIX.md`).
 
-It is drawn from the CogLean lab repository and from the earlier
-[CogLean-20261106-Intro](https://github.com/jeffshrager/CogLean-20261106-Intro), which carries
-the multi-digit model in full. It is an introduction, not a replacement for either.
+It is drawn from the [CogLean lab repository](https://github.com/jeffshrager/CogLean), which
+carries the multi-digit model in full, along with further domains and work in progress. It is
+an introduction, not a replacement for it.
 
 ## Packages
 
