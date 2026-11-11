@@ -1,13 +1,34 @@
 # CogLean-Intro
 
-An invitation to [CogLean](https://github.com/jeffshrager/CogLean), a library of cognitive
-theory in the Lean 4 proof assistant, organized on the model of Mathlib. Mechanisms are
-defined once, phenomena are stated without any mechanism, and theorems relating them are
-machine-checked. The theorems are explanations, proved about the same definitions that run as
-the model.
+**CogLean** is a library of cognitive theory written in the [Lean 4](https://lean-lang.org)
+programming language and proof assistant. In Lean, a definition is both a program that runs
+and a mathematical object that theorems can be about, so a cognitive model and the formal
+claims made about it are the same thing, and the claims are checked by machine. CogLean is
+organized on the model of [Mathlib](https://github.com/leanprover-community/mathlib4): mechanisms
+are defined once, phenomena are stated without any mechanism, laws are stated against shared
+interfaces, and theorems relating them accumulate in a library that anyone can extend.
 
-This edition is written for cognitive scientists who do not know Lean. Its paper asks four
-questions a cognitive scientist might ask, and answers each with one short demonstration:
+The premise is simple to state. Once we write down what we already believe about a cognitive
+theory with mathematical precision, the theory becomes something we can reason about
+mechanically, and we can discover things about it that we did not know: consequences it
+entails, phenomena it can never produce, assumptions its authors left unstated, predictions on
+which it differs from a rival. Formalization is the necessary first step; discovery is the
+payoff. Allen Newell asked how cognitive science could become cumulative. A shared library of
+machine-checked relationships between theories and phenomena is one answer: results proved
+once stay proved, stay aligned with the models that run, and are available to the next theory
+that uses the same constructs.
+
+Two cautions, stated up front. The checker establishes that conclusions follow from premises;
+whether the premises are true of people remains the business of experiment. And what is
+discovered this way is discovered about the *theories*. Its psychological significance depends
+on empirical assumptions, the bridges from what a theorem concerns to what an experiment
+measures, which this work tries to keep explicit.
+
+This repository is an **invitation**, written for cognitive scientists who do not know Lean.
+No Lean is needed to read the paper; where a few lines appear, each is paraphrased in English
+beside it. The paper, [`paper/paper.pdf`](paper/paper.pdf), asks four questions a cognitive
+scientist might ask of such a library and answers each with one short, fully proved
+demonstration:
 
 1. **Does a theory entail what its authors said?** Siegler and Shrager's 1984 distributions-of-
    associations model: its "nonintuitive prediction" proved, and a claim that needs a condition
