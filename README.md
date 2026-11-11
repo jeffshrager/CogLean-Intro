@@ -1,5 +1,8 @@
 # CogLean-Intro
 
+> This is the **introduction** to CogLean. The main repository, with the full library, more
+> domains and work in progress, is **[jeffshrager/CogLean](https://github.com/jeffshrager/CogLean)**.
+
 **CogLean** is a library of cognitive theory written in the [Lean 4](https://lean-lang.org)
 programming language and proof assistant. In Lean, a definition is both a program that runs
 and a mathematical object that theorems can be about, so a cognitive model and the formal
