@@ -49,14 +49,17 @@
 \begin{abstract}
 CogLean is a library of cognitive theory expressed in the Lean
 programming language and proof assistant, in which the definitions
-that run as models are the same objects that theorems are about. This
-paper is an invitation to cognitive scientists, and assumes no
-knowledge of Lean. It asks four questions a cognitive scientist might
-ask of such a library and answers each with one short demonstration.
-Does a theory entail what its authors said? Siegler and Shrager's 1984
-model of strategy choice is checked: its ``nonintuitive prediction''
-is proved, and a claim in the same chapter turns out to need a
-condition the chapter does not state. Can a theory be shown unable to
+that run as models are the same objects that theorems are about. Its
+premise is that once we write down what we already believe about a
+cognitive theory with mathematical precision, we can discover things
+about that theory that we did not know. This paper is an invitation
+to cognitive scientists, and assumes no knowledge of Lean. It asks
+four questions a cognitive scientist might ask of such a library and
+answers each with one short demonstration. Does a theory entail what
+its authors said? Siegler and Shrager's 1984 model of strategy choice
+is checked: its ``nonintuitive prediction'' is proved, and a claim in
+the same chapter turns out to need a condition the chapter does not
+state, a condition the formalization found. Can a theory be shown unable to
 produce a phenomenon? Collins and Quillian's hierarchical network can
 never show a typicality effect, for any network, while a feature
 comparison model can. Do independently formalized theories compose?
@@ -64,11 +67,15 @@ EPAM, the strategy-choice model and a problem solver compose into a
 model of three-digit addition, a pattern of confident errors is proved
 for the composition and for every memory satisfying three laws, a
 simplified ACT-R memory reaches the pattern by another route, and the
-two explanations differ on an experiment nobody has run. Can theories
+two explanations differ on an experiment nobody has run, which the
+comparison produced rather than presupposed. Can theories
 be compared by what they entail rather than how they fit? A memory
 theory matrix classifies four formalized memory families against six
-laws of retrieval, every verdict a theorem. The goal is to grow CogLean
-into a Mathlib-like repository of machine-checkable cognitive theory,
+laws of retrieval, every verdict a theorem. What these discoveries
+establish is about the theories, not directly about people; their
+psychological significance still turns on empirical assumptions. The
+goal is to grow CogLean into a Mathlib-like repository of
+machine-checkable cognitive theory, in which such results accumulate,
 and the paper closes with what each kind of cognitive scientist could
 contribute to it.
 \end{abstract}
@@ -86,7 +93,13 @@ from it? Is there a phenomenon it \emph{cannot} produce, whatever its
 parameters? When two theories explain the same phenomenon, do they
 explain it for the same reasons, and what observation would tell them
 apart? And can theories be compared by what they entail, rather than
-by how well each can be made to fit?
+by how well each can be made to fit? Behind all of these is one idea.
+If we can write down what we already believe about a theory with
+mathematical precision, then the theory becomes something we can
+reason about mechanically, and we can discover consequences,
+limitations and unstated assumptions that we did not know were there,
+and perhaps would not have found otherwise. Formalization is the
+necessary first step; discovery is the payoff.
 
 These questions are old, and cognitive scientists have always answered
 them by argument, by simulation, and sometimes by mathematics. What
@@ -119,8 +132,11 @@ mechanisms with assertions about those models and the phenomena they
 produce. One caution belongs here, at the start. The checker
 establishes that conclusions follow from premises. It does not
 establish that the premises are true of people; that remains the
-business of experiment. What it adds is that the entailments, once
-checked, stay checked, and can be built upon.
+business of experiment. What is discovered this way is discovered
+about the theories, and its psychological significance depends on
+empirical assumptions that the paper tries to keep in view. What the
+checker adds is that the entailments, once checked, stay checked, and
+can be built upon.
 
 This paper is an invitation, not a tutorial. No Lean is needed to read
 it; where a few lines of Lean appear, they are there to show what a
@@ -266,7 +282,10 @@ use (\lean{SC.correct\_strengthening\_never\_raises\_backup}). The
 chapter's claim needs a condition it does not state.
 
 I find this a useful kind of result, and not only because the chapter
-is mine. Nothing here says the model is wrong about children. It says
+is mine. It is a small discovery about a theory I thought I knew: the
+condition was not in the chapter, and I did not know it was missing
+until the proof would not go through without it. Nothing here says
+the model is wrong about children. It says
 that one of the things its authors believed followed from it does not
 follow without a further assumption, and it says exactly what the
 assumption buys. A reader who disagrees can point at the postulate they
@@ -637,8 +656,18 @@ or sampled. The strategy-choice chapter was held to its own claims;
 two models of semantic memory were held to three phenomena; three
 theories were composed and the composition held to a pattern that
 none of them produces alone, after which a fourth theory was held to
-the same pattern; and four memories were held to six laws. Because the
-phenomena and laws are shared, each result is available to the next
+the same pattern; and four memories were held to six laws. Two of the
+four did what the introduction promised first: they wrote down what
+we already believed, precisely, and established its exact scope. That
+Collins and Quillian's network cannot show typicality was folklore;
+now it is a theorem about every network. The other two went further
+and found things that were not known: a condition missing from a
+published claim, and a prediction on which two explanations of the
+same pattern disagree. Neither result is about children directly.
+Each is about a theory, and what it means for children depends on the
+bridges of Appendix~\ref{app:bridges}. That distinction is not a
+weakness. It is what lets the results be stated exactly and
+contested precisely. Because the phenomena and laws are shared, each result is available to the next
 theory that uses the same constructs, and the explanations themselves
 become reusable objects. A theorem characterizes a class of
 mechanisms; another theory joins the class by proving its laws, or
@@ -718,13 +747,19 @@ stated, not formalized.
 \label{sec:invite}
 
 Newell asked how cognitive science could become cumulative. CogLean is
-not a theory of cognition. It is a developing common framework in
-which researchers with different commitments can state, compare,
-criticize and improve explanations, and in which disagreements about
-assumptions, mechanisms, evidence and predictions become explicit
-objects of study. Cognitive science can accumulate not only
-experiments and models, but also reusable, contestable,
-machine-checked relationships between theories and phenomena.
+not a theory of cognition, and it is not meant to be a collection of
+independently formalized models. It is meant to become what Mathlib is
+for mathematics: a cumulative library of mechanisms, phenomena, laws
+and explanations, in which each contribution enables further
+deductions, and in which complex models stay aligned with equally
+complex explanations of their behavior as the library grows and
+changes. In such a library researchers with different commitments can
+state, compare, criticize and improve explanations, and disagreements
+about assumptions, mechanisms, evidence and predictions become
+explicit objects of study. Cognitive science can then accumulate not
+only experiments and models, but also what can be established about
+the relationships among theories and phenomena, and can reason its way
+to things it did not previously know.
 
 The demonstrations suggest what different kinds of cognitive
 scientists could contribute, and most of it needs no Lean.
